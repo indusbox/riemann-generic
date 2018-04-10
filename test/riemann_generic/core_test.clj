@@ -157,7 +157,15 @@
      {:time 30 :description "error"}
      {:time 51 :description "ggwp Error"}]
     [{:time 30 :description "error" :state "critical"}
+     {:time 51 :description "ggwp Error" :state "critical"}])
+  (test-stream (regex {:pattern ".*(?i)error.*" :state "critical" :field "description"})
+    [{:time 0  :description "foo"}
+     {:time 10 :description nil :metric nil}
+     {:time 30 :description "error"}
+     {:time 51 :description "ggwp Error"}]
+    [{:time 30 :description "error" :state "critical"}
      {:time 51 :description "ggwp Error" :state "critical"}]))
+
 
 (deftest regex-during-test
   (test-stream (regex-during {:pattern ".*(?i)error.*"
@@ -166,6 +174,15 @@
                               :state "critical"})
     [{:time 0  :description "foo"}
      {:time 10 :description "bar"}
+     {:time 30 :description "error"}
+     {:time 51 :description "ggwp Error"}]
+    [{:time 51 :description "ggwp Error" :state "critical"}])
+  (test-stream (regex-during {:pattern ".*(?i)error.*"
+                              :field "description" 
+                              :duration 20
+                              :state "critical"})
+    [{:time 0  :description "foo"}
+     {:time 10 :description nil}
      {:time 30 :description "error"}
      {:time 51 :description "ggwp Error"}]
     [{:time 51 :description "ggwp Error" :state "critical"}]))
