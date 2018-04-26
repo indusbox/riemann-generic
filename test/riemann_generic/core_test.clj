@@ -37,7 +37,24 @@
                 {:metric 8000 :time 14 :service "power"}
                 {:metric 9999 :time 15 :service "bar"}]
                [{:metric 9002 :state "disaster" :time 12 :service "power"}
-                {:metric 9500 :state "disaster" :time 13 :service "power"}]))
+                {:metric 9500 :state "disaster" :time 13 :service "power"}])
+    (test-stream (condition-during {:condition-fn #(and
+                                                     (> (:metric %) 9000)
+                                                     (compare (:service %) "power"))
+                                    :duration 10
+                                    :state "disaster"
+                                    :by-fields [:endpoint]})
+      [{:metric 10   :time 0  :service "power" :endpoint "/foo"}
+       {:metric 9001 :time 1  :service "power" :endpoint "/foo"}
+       {:metric 9001 :time 2  :service "bar"}
+       {:metric 20 :time 12 :service "power" :endpoint "/bar"}
+       {:metric 9002 :time 12 :service "power" :endpoint "/foo"}
+       {:metric 25 :time 13 :service "power" :endpoint "/bar"}
+       {:metric 9500 :time 13 :service "power" :endpoint "/foo"}
+       {:metric 8000 :time 14 :service "power"}
+       {:metric 9999 :time 15 :service "bar"}]
+      [{:metric 9002 :state "disaster" :time 12 :service "power" :endpoint "/foo"}
+       {:metric 9500 :state "disaster" :time 13 :service "power" :endpoint "/foo"}]))
   (testing "should not find event over 9000 during 10s with instabilized metrics "
     (test-stream (condition-during {:condition-fn #(and 
                                                      (> (:metric %) 9000) 
@@ -76,7 +93,42 @@
                [{:metric 80 :time 1}
                 {:metric 40 :time 12}
                 {:metric 90 :time 13}]
-               []))
+               [])
+  (test-stream (above-during {:threshold 70 :duration 10 :state "critical" :by-fields [:device]})
+               [{:metric 80 :device "a" :time 1}
+                {:metric 10 :device "b" :time 1}
+                {:metric 81 :device "a" :time 5}
+                {:metric 11 :device "b" :time 5}
+                {:metric 82 :device "a" :time 12}
+                {:metric 12 :device "b" :time 12}]
+                [{:metric 82 :device "a" :state "critical" :time 12}])
+  (test-stream (above-during {:threshold 70 :duration 10 :state "critical" :by-fields ["device"]})
+               [{:metric 80 :device "a" :time 1}
+                {:metric 10 :device "b" :time 1}
+                {:metric 81 :device "a" :time 5}
+                {:metric 11 :device "b" :time 5}
+                {:metric 82 :device "a" :time 12}
+                {:metric 12 :device "b" :time 12}]
+               [{:metric 82 :device "a" :state "critical" :time 12}])
+  (test-stream (above-during {:threshold 100 :duration 10 :state "critical" :by-fields ["endpoint" "host"]})
+               [{:metric 101 :endpoint "/dogs" :host "staging" :time 1}
+                {:metric 75 :endpoint "/cats" :host "staging" :time 1}
+                {:metric 85 :endpoint "/dogs" :host "prod" :time 1}
+                {:metric 80 :endpoint "/cats" :host "prod" :time 1}
+                {:metric 120 :endpoint "/dogs" :host "staging" :time 5}
+                {:metric 90 :endpoint "/cats" :host "staging" :time 5}
+                {:metric 55 :endpoint "/dogs" :host "prod" :time 5}
+                {:metric 45 :endpoint "/cats" :host "prod" :time 5}
+                {:metric 150 :endpoint "/dogs" :host "staging" :time 12}
+                {:metric 120 :endpoint "/cats" :host "staging" :time 12}
+                {:metric 67 :endpoint "/dogs" :host "prod" :time 12}
+                {:metric 33 :endpoint "/cats" :host "prod" :time 12}
+                {:metric 80 :endpoint "/dogs" :host "staging" :time 25}
+                {:metric 250 :endpoint "/cats" :host "staging" :time 25}
+                {:metric 79 :endpoint "/dogs" :host "prod" :time 25}
+                {:metric 69 :endpoint "/cats" :host "prod" :time 25}]
+               [{:metric 150 :endpoint "/dogs" :host "staging" :time 12 :state "critical"}
+                {:metric 250 :endpoint "/cats" :host "staging" :time 25 :state "critical"}]))
 
 (deftest below-test
   (test-stream (below {:threshold 9000 :state "critical"})
@@ -96,7 +148,15 @@
                 {:metric 41 :time 13}
                 {:metric 90 :time 14}]
                [{:metric 40 :state "critical" :time 12}
-                {:metric 41 :state "critical" :time 13}]))
+                {:metric 41 :state "critical" :time 13}])
+  (test-stream (below-during {:threshold 70 :duration 10 :state "critical" :by-fields [:device]})
+    [{:metric 80 :device "a" :time 1}
+     {:metric 10 :device "b" :time 1}
+     {:metric 81 :device "a" :time 5}
+     {:metric 11 :device "b" :time 5}
+     {:metric 82 :device "a" :time 12}
+     {:metric 12 :device "b" :time 12}]
+    [{:metric 12 :device "b" :state "critical" :time 12}]))
 
 (deftest outside-test
   (test-stream (outside {:min-threshold 70
@@ -122,7 +182,24 @@
                 {:metric 1   :time 13}
                 {:metric 70  :time 14}]
                [{:metric 101 :state "critical" :time 12}
-                {:metric 1   :state "critical" :time 13}]))
+                {:metric 1   :state "critical" :time 13}])
+  (test-stream (outside-during {:min-threshold 70
+                                :max-threshold 90
+                                :duration 10
+                                :state "critical"
+                                :by-fields [:device]})
+    [{:metric 80  :time 0   :device "a"}
+     {:metric 80  :time 0   :device "b"}
+     {:metric 100 :time 1   :device "a"}
+     {:metric 81 :time 1    :device "b"}
+     {:metric 101 :time 12  :device "a"}
+     {:metric 82 :time 12   :device "b"}
+     {:metric 1   :time 13  :device "a"}
+     {:metric 83   :time 13 :device "b"}
+     {:metric 70  :time 14  :device "a"}
+     {:metric 84  :time 14  :device "b"}]
+    [{:metric 101 :device "a" :state "critical" :time 12}
+     {:metric 1   :device "a" :state "critical" :time 13}]))
 
 (deftest between-test
   (test-stream (between {:min-threshold 70
@@ -148,7 +225,24 @@
                 {:metric 81 :time 13}
                 {:metric 10 :time 14}]
                [{:metric 80 :state "critical" :time 12}
-                {:metric 81 :state "critical" :time 13}]))
+                {:metric 81 :state "critical" :time 13}])
+  (test-stream (between-during {:min-threshold 70
+                                :max-threshold 90
+                                :duration 10
+                                :state "critical"
+                                :by-fields [:device]})
+    [{:metric 99 :time 0   :device "a"}
+     {:metric 99 :time 0   :device "b"}
+     {:metric 80 :time 1   :device "a"}
+     {:metric 98 :time 1   :device "b"}
+     {:metric 80 :time 12  :device "a"}
+     {:metric 99 :time 12  :device "b"}
+     {:metric 81 :time 13  :device "a"}
+     {:metric 97 :time 13  :device "b"}
+     {:metric 10 :time 14  :device "a"}
+     {:metric 95 :time 14  :device "b"}]
+    [{:metric 80 :device "a" :state "critical" :time 12}
+     {:metric 81 :device "a" :state "critical" :time 13}]))
 
 (deftest regex-test
   (test-stream (regex {:pattern ".*(?i)error.*" :state "critical" :field "description"})
@@ -185,7 +279,21 @@
      {:time 10 :description nil}
      {:time 30 :description "error"}
      {:time 51 :description "ggwp Error"}]
-    [{:time 51 :description "ggwp Error" :state "critical"}]))
+    [{:time 51 :description "ggwp Error" :state "critical"}])
+  (test-stream (regex-during {:pattern ".*(?i)error.*"
+                              :field "description"
+                              :duration 20
+                              :state "critical"
+                              :by-fields [:device]})
+    [{:time 0  :description "foo" :device "a"}
+     {:time 0  :description "foo" :device "b"}
+     {:time 10 :description nil :device "a"}
+     {:time 10 :description nil :device "b"}
+     {:time 30 :description "error" :device "a"}
+     {:time 30 :description "success" :device "b"}
+     {:time 51 :description "ggwp Error" :device "a"}
+     {:time 51 :description "ggwp Success" :device "b"}]
+    [{:time 51 :description "ggwp Error" :device "a" :state "critical"}]))
 
 (deftest ddt-condition-test
   (test-stream (ddt-condition {:dt 3
