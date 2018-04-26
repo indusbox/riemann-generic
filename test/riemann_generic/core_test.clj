@@ -24,8 +24,8 @@
 
 (deftest condition-during-test
   (testing "should find event over 9000 during 10s "
-    (test-stream (condition-during {:condition-fn #(and 
-                                                     (> (:metric %) 9000) 
+    (test-stream (condition-during {:condition-fn #(and
+                                                     (> (:metric %) 9000)
                                                      (compare (:service %) "power"))
                                        :duration 10
                                        :state "disaster"})
@@ -56,8 +56,8 @@
       [{:metric 9002 :state "disaster" :time 12 :service "power" :endpoint "/foo"}
        {:metric 9500 :state "disaster" :time 13 :service "power" :endpoint "/foo"}]))
   (testing "should not find event over 9000 during 10s with instabilized metrics "
-    (test-stream (condition-during {:condition-fn #(and 
-                                                     (> (:metric %) 9000) 
+    (test-stream (condition-during {:condition-fn #(and
+                                                     (> (:metric %) 9000)
                                                      (compare (:service %) "power"))
                                        :duration 10
                                        :state "disaster"})
@@ -94,6 +94,38 @@
                 {:metric 40 :time 12}
                 {:metric 90 :time 13}]
                [])
+  (test-stream (above-during {:threshold 70 :duration 10 :state "critical"})
+              [{:metric 80 :device "a" :time 1}
+               {:metric 10 :device "b" :time 1}
+               {:metric 81 :device "a" :time 5}
+               {:metric 11 :device "b" :time 5}
+               {:metric 82 :device "a" :time 12}
+               {:metric 12 :device "b" :time 12}]
+              [])
+  (test-stream (above-during {:threshold 70 :duration 10 :state "critical" :by-fields nil})
+              [{:metric 80 :device "a" :time 1}
+               {:metric 10 :device "b" :time 1}
+               {:metric 81 :device "a" :time 5}
+               {:metric 11 :device "b" :time 5}
+               {:metric 82 :device "a" :time 12}
+               {:metric 12 :device "b" :time 12}]
+              [])
+  (test-stream (above-during {:threshold 70 :duration 10 :state "critical" :by-fields [nil]})
+              [{:metric 80 :device "a" :time 1}
+               {:metric 10 :device "b" :time 1}
+               {:metric 81 :device "a" :time 5}
+               {:metric 11 :device "b" :time 5}
+               {:metric 82 :device "a" :time 12}
+               {:metric 12 :device "b" :time 12}]
+              [])
+  (test-stream (above-during {:threshold 70 :duration 10 :state "critical" :by-fields [:device nil]})
+              [{:metric 80 :device "a" :time 1}
+               {:metric 10 :device "b" :time 1}
+               {:metric 81 :device "a" :time 5}
+               {:metric 11 :device "b" :time 5}
+               {:metric 82 :device "a" :time 12}
+               {:metric 12 :device "b" :time 12}]
+              [{:metric 82 :device "a" :state "critical" :time 12}])
   (test-stream (above-during {:threshold 70 :duration 10 :state "critical" :by-fields [:device]})
                [{:metric 80 :device "a" :time 1}
                 {:metric 10 :device "b" :time 1}
@@ -149,6 +181,14 @@
                 {:metric 90 :time 14}]
                [{:metric 40 :state "critical" :time 12}
                 {:metric 41 :state "critical" :time 13}])
+  (test-stream (below-during {:threshold 70 :duration 10 :state "critical" :by-fields nil})
+              [{:metric 80 :time 0}
+               {:metric 40 :time 1}
+               {:metric 40 :time 12}
+               {:metric 41 :time 13}
+               {:metric 90 :time 14}]
+              [{:metric 40 :state "critical" :time 12}
+               {:metric 41 :state "critical" :time 13}])
   (test-stream (below-during {:threshold 70 :duration 10 :state "critical" :by-fields [:device]})
     [{:metric 80 :device "a" :time 1}
      {:metric 10 :device "b" :time 1}
@@ -263,7 +303,7 @@
 
 (deftest regex-during-test
   (test-stream (regex-during {:pattern ".*(?i)error.*"
-                              :field "description" 
+                              :field "description"
                               :duration 20
                               :state "critical"})
     [{:time 0  :description "foo"}
@@ -272,7 +312,7 @@
      {:time 51 :description "ggwp Error"}]
     [{:time 51 :description "ggwp Error" :state "critical"}])
   (test-stream (regex-during {:pattern ".*(?i)error.*"
-                              :field "description" 
+                              :field "description"
                               :duration 20
                               :state "critical"})
     [{:time 0  :description "foo"}
@@ -328,9 +368,9 @@
      {:time 2  :service "foo" :metric -1};ignored
      {:time 3  :service "foo" :metric 2}
      {:time 4  :service "foo" :metric -3};ignored
-     {:time 5  :service "foo" :metric 14} 
+     {:time 5  :service "foo" :metric 14}
      {:time 6  :service "foo" :metric 20};ignored
-     {:time 7  :service "foo" :metric 15} 
+     {:time 7  :service "foo" :metric 15}
      {:time 8  :service "foo" :metric 20};ignored
      {:time 9  :service "foo" :metric -1}
      {:time 10 :service "foo" :metric 0}];ignored
@@ -367,9 +407,9 @@
      {:time 2  :service "foo" :metric -1};ignored
      {:time 3  :service "foo" :metric 2}
      {:time 4  :service "foo" :metric -3};ignored
-     {:time 5  :service "foo" :metric 14} 
+     {:time 5  :service "foo" :metric 14}
      {:time 6  :service "foo" :metric 20};ignored
-     {:time 7  :service "foo" :metric 16} 
+     {:time 7  :service "foo" :metric 16}
      {:time 8  :service "foo" :metric 20};ignored
      {:time 9  :service "foo" :metric -2}
      {:time 10 :service "foo" :metric 0}];ignored
@@ -395,12 +435,12 @@
      {:time 6  :metric 6 :service "foo" :host "b" }
      {:time 6  :metric 6 :service "bar" :host "b" }
      {:time 7  :metric 7 :service "foo" :host "a" }]
-    [{:time 0, :metric 0, :service "received:foo_from:a", :host "a", :ttl 300} 
+    [{:time 0, :metric 0, :service "received:foo_from:a", :host "a", :ttl 300}
      {:time 1, :metric 1, :service "received:foo_from:b", :host "b", :ttl 300}
-     {:time 1, :metric 1, :service "received:bar_from:b", :host "b", :ttl 300} 
+     {:time 1, :metric 1, :service "received:bar_from:b", :host "b", :ttl 300}
      {:time 3, :metric 3, :service "received:foo_from:a", :host "a", :ttl 300}
      {:time 3, :metric 3, :service "received:bar_from:a", :host "a", :ttl 300}
-     {:time 5, :metric 5, :service "received:foo_from:b", :host "b", :ttl 300} 
+     {:time 5, :metric 5, :service "received:foo_from:b", :host "b", :ttl 300}
      {:time 6, :metric 6, :service "received:bar_from:b", :host "b", :ttl 300}
      {:time 7, :metric 7, :service "received:foo_from:a", :host "a", :ttl 300}
     ]))
@@ -423,8 +463,8 @@
 
   (let [out (atom [])
         child #(swap! out conj %)
-        s (generate-streams {:condition-during [{:condition-fn #(and 
-                                                                  (> (:metric %) 9000) 
+        s (generate-streams {:condition-during [{:condition-fn #(and
+                                                                  (> (:metric %) 9000)
                                                                   (compare (:service %) "power"))
                                           :duration 10
                                           :state "disaster"

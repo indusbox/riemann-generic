@@ -36,6 +36,7 @@
   - `:condition-fn` : A function accepting an event and returning a boolean.
   - `:duration`     : The time period in seconds.
   - `:state`        : The state of event forwarded to children.
+  - `:by-fields` : An optional list of field to group events.
 
   Example:
 
@@ -43,20 +44,22 @@
                                       (> (:metric %) 42) 
                                       (compare (:service %) \"foo\"))
                      :duration 10
-                     :state \"critical\"})
+                     :state \"critical\"
+                     :by-fields [:service]})
 
-  Set `:state` to \"critical\" if events `:metric` is > to 42 and `:metric` is \"foo\" during 10 sec or more."
+  Set `:state` to \"critical\" if events `:metric` is > to 42 and `:metric` is \"foo\" during 10 sec or more for a specific service."
   [opts & children]
-  (if (contains? opts :by-fields)
-    (by (map keyword (:by-fields opts))
+  (let [by-fields (map keyword (remove nil? (or (:by-fields opts) [])))]
+    (if (not-empty by-fields)
+      (by by-fields
+        (dt/cond-dt (:condition-fn opts) (:duration opts)
+          (with :state (:state opts)
+            (fn [event]
+              (call-rescue event children)))))
       (dt/cond-dt (:condition-fn opts) (:duration opts)
         (with :state (:state opts)
           (fn [event]
-            (call-rescue event children)))))
-    (dt/cond-dt (:condition-fn opts) (:duration opts)
-      (with :state (:state opts)
-        (fn [event]
-          (call-rescue event children))))))
+            (call-rescue event children)))))))
 
 
 (defn above
@@ -84,23 +87,25 @@
   - `:threshold` : The threshold used by the above stream
   - `:duration`  : The time period in seconds.
   - `:state`     : The state of event forwarded to children.
+  - `:by-fields` : An optional list of field to group events.
 
   Example:
 
-  (above-during {:threshold 70 :duration 10 :state \"critical\"} email)
+  (above-during {:threshold 70 :duration 10 :state \"critical\" :by-fields [:service]} email)
 
-  Set `:state` to \"critical\" if events `:metric` is > to 70 during 10 sec or more."
+  Set `:state` to \"critical\" if events `:metric` is > to 70 during 10 sec or more for a specific service."
   [opts & children]
-  (if (contains? opts :by-fields)
-    (by (map keyword (:by-fields opts))
+  (let [by-fields (map keyword (remove nil? (or (:by-fields opts) [])))]
+    (if (not-empty by-fields)
+      (by by-fields
+        (dt/above (:threshold opts) (:duration opts)
+          (with :state (:state opts)
+            (fn [event]
+              (call-rescue event children)))))
       (dt/above (:threshold opts) (:duration opts)
         (with :state (:state opts)
           (fn [event]
-            (call-rescue event children)))))
-    (dt/above (:threshold opts) (:duration opts)
-      (with :state (:state opts)
-        (fn [event]
-          (call-rescue event children))))))
+            (call-rescue event children)))))))
 
 (defn below
   "if the `:metric` event value is strictly inferior to the values of `:threshold` in `opts` and update the event state accordingly, and forward to children.
@@ -127,23 +132,25 @@
   - `:threshold` : The threshold used by the above stream
   - `:duration`  : The time period in seconds.
   - `:state`     : The state of event forwarded to children.
+  - `:by-fields` : An optional list of field to group events.
 
   Example:
 
-  (below-during {:threshold 70 :duration 10 :state \"critical\"} email)
+  (below-during {:threshold 70 :duration 10 :state \"critical\" :by-fields [:service]} email)
 
-  Set `:state` to \"critical\" if events `:metric` is < to 70 during 10 sec or more."
+  Set `:state` to \"critical\" if events `:metric` is < to 70 during 10 sec or more for a specific service."
   [opts & children]
-  (if (contains? opts :by-fields)
-    (by (map keyword (:by-fields opts))
+  (let [by-fields (map keyword (remove nil? (or (:by-fields opts) [])))]
+    (if (not-empty by-fields)
+      (by by-fields
+        (dt/below (:threshold opts) (:duration opts)
+          (with :state (:state opts)
+            (fn [event]
+              (call-rescue event children)))))
       (dt/below (:threshold opts) (:duration opts)
         (with :state (:state opts)
           (fn [event]
-            (call-rescue event children)))))
-    (dt/below (:threshold opts) (:duration opts)
-      (with :state (:state opts)
-        (fn [event]
-          (call-rescue event children))))))
+            (call-rescue event children)))))))
 
 (defn outside
   "If the condition `(or (< (:metric event) low) (> (:metric event) high))` is valid for all events received, valid events received will be passed on until an invalid event arrives.
@@ -175,26 +182,29 @@
   - `:max-threshold` : The max threshold
   - `:duration`      : The time period in seconds.
   - `:state`         : The state of event forwarded to children.
+  - `:by-fields`     : An optional list of field to group events.
 
   Example:
 
   (outside-during {:min-threshold 70
                    :max-threshold 90
                    :duration 10
-                   :state \"critical\"})
+                   :state \"critical\"
+                   :by-fields [:service]})
 
-  Set `:state` to \"critical\" if events `:metric` is < to 70 or > 90 during 10 sec or more."
+  Set `:state` to \"critical\" if events `:metric` is < to 70 or > 90 during 10 sec or more for a specific service."
   [opts & children]
-  (if (contains? opts :by-fields)
-    (by (map keyword (:by-fields opts))
+  (let [by-fields (map keyword (remove nil? (or (:by-fields opts) [])))]
+    (if (not-empty by-fields)
+      (by by-fields
+        (dt/outside (:min-threshold opts) (:max-threshold opts) (:duration opts)
+          (with :state (:state opts)
+            (fn [event]
+              (call-rescue event children)))))
       (dt/outside (:min-threshold opts) (:max-threshold opts) (:duration opts)
         (with :state (:state opts)
           (fn [event]
-            (call-rescue event children)))))
-    (dt/outside (:min-threshold opts) (:max-threshold opts) (:duration opts)
-      (with :state (:state opts)
-        (fn [event]
-          (call-rescue event children))))))
+            (call-rescue event children)))))))
 
 (defn between
   "If the condition `(and (> (:metric event) low) (< (:metric event) high))` is valid for all events received, valid events received will be passed on until an invalid event arrives.
@@ -204,15 +214,17 @@
   - `:min-threshold` : The min threshold
   - `:max-threshold` : The max threshold
   - `:state`         : The state of event forwarded to children.
+  - `:by-fields` : An optional list of field to group events.
 
   Example:
 
   (between-during {:min-threshold 70
                    :max-threshold 90
                    :service \"bar\"
-                   :state \"critical\"})
+                   :state \"critical\"
+                   :by-fields [:service]})
 
-  Set `:state` to \"critical\" if events `:metric` is > to 70 and < 90."
+  Set `:state` to \"critical\" if events `:metric` is > to 70 and < 90 for a specific service."
   [opts & children]
   (apply condition {:condition-fn #(and
                                      (> (:metric %) (:min-threshold opts))
@@ -229,6 +241,7 @@
   - `:max-threshold` : The max threshold
   - `:duration`      : The time period in seconds.
   - `:state`         : The state of event forwarded to children.
+  - `:by-fields`     : An optional list of field to group events.
 
   Example:
 
@@ -236,20 +249,22 @@
                    :max-threshold 90
                    :duration 10
                    :service \"bar\"
-                   :state \"critical\"})
+                   :state \"critical\"
+                   :by-fields [:service]})
 
-  Set `:state` to \"critical\" if events `:metric` is > to 70 and < 90 during 10 sec or more."
+  Set `:state` to \"critical\" if events `:metric` is > to 70 and < 90 during 10 sec or more for a specific service."
   [opts & children]
-  (if (contains? opts :by-fields)
-    (by (map keyword (:by-fields opts))
+  (let [by-fields (map keyword (remove nil? (or (:by-fields opts) [])))]
+    (if (not-empty by-fields)
+      (by by-fields
+        (dt/between (:min-threshold opts) (:max-threshold opts) (:duration opts)
+          (with :state (:state opts)
+            (fn [event]
+              (call-rescue event children)))))
       (dt/between (:min-threshold opts) (:max-threshold opts) (:duration opts)
         (with :state (:state opts)
           (fn [event]
-            (call-rescue event children)))))
-    (dt/between (:min-threshold opts) (:max-threshold opts) (:duration opts)
-      (with :state (:state opts)
-        (fn [event]
-          (call-rescue event children))))))
+            (call-rescue event children)))))))
 
 (defn regex
   "if regex `:pattern` matched `:field` of all events received, the matched events will be passed on until an invalid event arrives. The matched event `:state` will be set to `state` and forward to children.
@@ -284,20 +299,23 @@
   - `:field`    : Apply regex to field of event
   - `:duration` : The time period in seconds.
   - `:state`    : The state of event forwarded to children.
+  - `:by-fields` : An optional list of field to group events.
 
   Example:
 
   (regex-during {:pattern '.*(?i)error.*'
                  :duration 10
-                 :state \"critical\"}
+                 :state \"critical\"
+                 :by-fields [:service]}
                 children)
 
-  Set `:state` to \"critical\" if metric of events contain \"error\" during 10 sec or more."
+  Set `:state` to \"critical\" if metric of events contain \"error\" during 10 sec or more for a specific service."
   [opts & children]
   (apply condition-during {:condition-fn #(and
                                             (not= ((keyword (:field opts)) %) nil)
                                             (re-matches (re-pattern (:pattern opts)) ((keyword (:field opts)) %)))
                            :duration (:duration opts)
+                           :by-fields (or (:by-fields opts) [])
                            :state (:state opts)}
     children))
 (defn ddt-condition
